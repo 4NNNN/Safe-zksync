@@ -3,6 +3,7 @@ pragma solidity >=0.8.12 <0.9.0;
 
 import "./storage/IGuardianstorage.sol";
 //import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import { SignatureChecker } from "@matterlabs/signature-checker/contracts/SignatureChecker.sol";
 import "contracts/TwoUserMultisig.sol";
 import "contracts/Modules/lib/Enum.sol";
 
@@ -121,16 +122,16 @@ contract SocialRecoveryModule {
         return keccak256(encodeRecoveryData(_wallet, _newOwners, _newThreshold, _nonce));
     }
 
-    // /// @dev checks if valid signature to the provided signer, and if this signer is indeed a guardian, revert otherwise
-    // function validateGuardianSignature(
-    //     address _wallet,
-    //     bytes32 _signHash,
-    //     address _signer,
-    //     bytes memory _signature
-    // ) public view {
-    //     require(isGuardian(_wallet, _signer), "SM: Signer not a guardian");
-    //     require(SignatureChecker.isValidSignatureNow(_signer, _signHash, _signature), "SM: Invalid guardian signature");
-    // }
+    /// @dev checks if valid signature to the provided signer, and if this signer is indeed a guardian, revert otherwise
+    function validateGuardianSignature(
+        address _wallet,
+        bytes32 _signHash,
+        address _signer,
+        bytes memory _signature
+    ) public view {
+        require(isGuardian(_wallet, _signer), "SM: Signer not a guardian");
+        require(SignatureChecker.isValidSignatureNow(_signer, _signHash, _signature), "SM: Invalid guardian signature");
+    }
 
 
     /**
@@ -157,44 +158,44 @@ contract SocialRecoveryModule {
          _executeRecovery(_wallet, _newOwners, _newThreshold, _approvalCount);
     }
 
-    // /**
-    //  * @notice Lets multiple guardians confirm the execution of the recovery request.
-    //  * Can also trigger the start of the execution by passing true to '_execute' parameter.
-    //  * Once triggered the recovery is pending for the recovery period before it can be finalised.
-    //  * @param _wallet The target wallet.
-    //  * @param _newOwners The new owners' addressess.
-    //  * @param _newThreshold The new threshold for the safe.
-    //  * @param _signatures The guardians signatures.
-    //  * @param _execute Whether to auto-start execution of recovery.
-    //  */
-    // function multiConfirmRecovery(address _wallet, address[] calldata _newOwners, uint256 _newThreshold, SignatureData[] memory _signatures, bool _execute) external {
-    //     require(_newOwners.length > 0, "SM: owners cannot be empty");
-    //     require(_newThreshold > 0 && _newOwners.length >= _newThreshold, "SM: invalid new threshold");
-    //     require(_signatures.length > 0, "SM: empty signatures");
-    //     uint256 guardiansThreshold = threshold(_wallet);
-    //     require(guardiansThreshold > 0, "SM: empty guardians");
-    //     //
-    //     uint256 _nonce = nonce(_wallet);
-    //     bytes32 recoveryHash = keccak256(encodeRecoveryData(_wallet, _newOwners, _newThreshold, _nonce));
-    //     address lastSigner = address(0);
-    //     for (uint256 i = 0; i < _signatures.length; i++) {
-    //         SignatureData memory value = _signatures[i];
-    //         if (value.signature.length == 0){
-    //             require(isGuardian(_wallet, msg.sender), "SM: sender not a guardian");
-    //             require(msg.sender == value.signer, "SM: null signature should have the signer as the sender");
-    //         }else{
-    //             validateGuardianSignature(_wallet, recoveryHash, value.signer, value.signature);
-    //         }
-    //         require(value.signer > lastSigner, "SM: duplicate signers/invalid ordering");
-    //         confirmedHashes[recoveryHash][value.signer] = true;
-    //         lastSigner = value.signer;
-    //     }
-    //     //
-    //     if (!_execute) return;
-    //     uint256 _approvalCount = getRecoveryApprovals(_wallet, _newOwners, _newThreshold);
-    //     require(_approvalCount >= guardiansThreshold, "SM: confirmed signatures less than threshold");
-    //     _executeRecovery(_wallet, _newOwners, _newThreshold, _approvalCount);
-    // }
+    /**
+     * @notice Lets multiple guardians confirm the execution of the recovery request.
+     * Can also trigger the start of the execution by passing true to '_execute' parameter.
+     * Once triggered the recovery is pending for the recovery period before it can be finalised.
+     * @param _wallet The target wallet.
+     * @param _newOwners The new owners' addressess.
+     * @param _newThreshold The new threshold for the safe.
+     * @param _signatures The guardians signatures.
+     * @param _execute Whether to auto-start execution of recovery.
+     */
+    function multiConfirmRecovery(address _wallet, address[] calldata _newOwners, uint256 _newThreshold, SignatureData[] memory _signatures, bool _execute) external {
+        require(_newOwners.length > 0, "SM: owners cannot be empty");
+        require(_newThreshold > 0 && _newOwners.length >= _newThreshold, "SM: invalid new threshold");
+        require(_signatures.length > 0, "SM: empty signatures");
+        uint256 guardiansThreshold = threshold(_wallet);
+        require(guardiansThreshold > 0, "SM: empty guardians");
+        //
+        uint256 _nonce = nonce(_wallet);
+        bytes32 recoveryHash = keccak256(encodeRecoveryData(_wallet, _newOwners, _newThreshold, _nonce));
+        address lastSigner = address(0);
+        for (uint256 i = 0; i < _signatures.length; i++) {
+            SignatureData memory value = _signatures[i];
+            if (value.signature.length == 0){
+                require(isGuardian(_wallet, msg.sender), "SM: sender not a guardian");
+                require(msg.sender == value.signer, "SM: null signature should have the signer as the sender");
+            }else{
+                validateGuardianSignature(_wallet, recoveryHash, value.signer, value.signature);
+            }
+            require(value.signer > lastSigner, "SM: duplicate signers/invalid ordering");
+            confirmedHashes[recoveryHash][value.signer] = true;
+            lastSigner = value.signer;
+        }
+        //
+        if (!_execute) return;
+        uint256 _approvalCount = getRecoveryApprovals(_wallet, _newOwners, _newThreshold);
+        require(_approvalCount >= guardiansThreshold, "SM: confirmed signatures less than threshold");
+        _executeRecovery(_wallet, _newOwners, _newThreshold, _approvalCount);
+    }
 
 
     function executeRecovery(address _wallet, address[] calldata _newOwners, uint256 _newThreshold) external {
